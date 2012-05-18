@@ -1,5 +1,5 @@
 #region licence/info
-
+//quick update for 27.2beta
 //////project name
 //vvvv plugin template
 
@@ -39,6 +39,7 @@ using VVVV.Utils.VMath;
 using SlimDX;
 using SlimDX.Direct3D9;
 
+
 //the vvvv node namespace
 namespace VVVV.Nodes
 {
@@ -62,7 +63,7 @@ namespace VVVV.Nodes
 		private IDXMeshOut MeshOut;
 
 		//a list that holds a mesh for every device
-		private Dictionary<int, Mesh> FDeviceMeshes = new Dictionary<int, Mesh>();
+		private Dictionary<Device, Mesh> FDeviceMeshes = new Dictionary<Device, Mesh>();
 
 
         protected bool update = false;
@@ -82,7 +83,7 @@ namespace VVVV.Nodes
         protected sVxBuffer[] VxBuffer;
         protected short[] IxBuffer;
 
-        protected DataStream sVx, sIx;
+        protected SlimDX.DataStream sVx, sIx;
 
 
 		#endregion field declaration
@@ -317,7 +318,7 @@ namespace VVVV.Nodes
 		
 		#region DXMesh
 
-        private void RemoveResource(int OnDevice)
+        private void RemoveResource(Device OnDevice)
         {
             Mesh m = FDeviceMeshes[OnDevice];
             //FHost.Log(TLogType.Debug, "Destroying Resource...");
@@ -325,7 +326,7 @@ namespace VVVV.Nodes
             m.Dispose();
         }
 
-		public void UpdateResource(IPluginOut ForPin, int OnDevice)
+		public void UpdateResource(IPluginOut ForPin, Device OnDevice)
 		{
 			//Called by the PluginHost every frame for every device. Therefore a plugin should only do 
 			//device specific operations here and still keep node specific calculations in the Evaluate call.
@@ -343,10 +344,10 @@ namespace VVVV.Nodes
 
             if (update)
             {
-                Device dev = Device.FromPointer(new IntPtr(OnDevice));
+               // Device dev = Device.FromPointer(new IntPtr(OnDevice));
                 try
                 {
-                    Mesh nuMesh = new Mesh(dev, numIndices / 3, numVertsOut, MeshFlags.Dynamic | MeshFlags.WriteOnly, VertexFormat.PositionNormal);
+                    Mesh nuMesh = new Mesh(OnDevice, numIndices / 3, numVertsOut, MeshFlags.Dynamic | MeshFlags.WriteOnly, VertexFormat.PositionNormal);
 
                     sVx = nuMesh.LockVertexBuffer(LockFlags.Discard);
                     sIx = nuMesh.LockIndexBuffer(LockFlags.Discard);
@@ -372,20 +373,25 @@ namespace VVVV.Nodes
                 }
                 finally
                 {
-                    dev.Dispose();
+                    //dev.Dispose();
                     update = false;
                 }
             }
 		}
 		
-		public void DestroyResource(IPluginOut ForPin, int OnDevice, bool OnlyUnManaged)
+		public void DestroyResource(IPluginOut ForPin, Device OnDevice, bool OnlyUnManaged)
 		{
 			//Called by the PluginHost whenever a resource for a specific pin needs to be destroyed on a specific device. 
 			//This is also called when the plugin is destroyed, so don't dispose dxresources in the plugins destructor/Dispose()
 
 			try
 			{
-				RemoveResource(OnDevice);
+				//RemoveResource(OnDevice);
+                Mesh m = FDeviceMeshes[OnDevice];
+                FDeviceMeshes.Remove(OnDevice);
+                //dispose mesh
+                m.Dispose();
+
 			}
 			catch
 			{
@@ -393,20 +399,24 @@ namespace VVVV.Nodes
 			}
 		}
 		
-		public void GetMesh(IDXMeshOut ForPin, int OnDevice, out int MeshPointer)
+		public Mesh GetMesh(IDXMeshOut ForPin, Device OnDevice)
 		{
 			// Called by the PluginHost everytime a mesh is accessed via a pin on the plugin.
 			// This is called from the PluginHost from within DirectX BeginScene/EndScene,
 			// therefore the plugin shouldn't be doing much here other than handing back the right mesh
 
-			MeshPointer = 0;
+			//MeshPointer = 0;
 			//in case the plugin has several mesh outputpins a test for the pin can be made here to get the right mesh.
-			if (ForPin == MeshOut)
-			{
-				Mesh m = FDeviceMeshes[OnDevice];
-				if (m != null)
-					MeshPointer = m.ComPointer.ToInt32();
-			}
+			if (ForPin == this.MeshOut&& FDeviceMeshes.ContainsKey(OnDevice))
+			
+				//Mesh m = FDeviceMeshes[OnDevice];
+				//if (m != null)
+				//	MeshPointer = m.ComPointer.ToInt32();
+                return FDeviceMeshes[OnDevice];
+			else
+				return null;
+
+			
 		}
 
 		#endregion
